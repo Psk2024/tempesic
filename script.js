@@ -247,7 +247,7 @@ function showEmployeeModal(employeeId, rowIndex) {
       overflow: hidden;
     ">
   ${imageUrl ? 
-        `<img src="${imageUrl}" alt="images/default.png" style="
+        `<img src="${imageUrl}" alt="'images/default.png'" style="
             width: 100%; 
             height: 100%; 
             border-radius: 50%; 
