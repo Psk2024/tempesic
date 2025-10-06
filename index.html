@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>List of Officers/Officials</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<header>
+  <h1>List of Officers/Officials
+  <div id="overallCountDisplay"></div>
+  </h1>
+</header>
+
+<main>
+  <section class="controls">
+    <select id="cadreSelect">
+      <option value="">All Branches</option>
+    </select>
+    <input type="search" id="searchInput" placeholder="Search employees..." />
+  </section>
+  <section id="employeeTableContainer" aria-live="polite">
+    </section>
+</main>
+
+<div id="employeeModal" class="modal">
+  <div class="modal-content">
+    <span class="close-btn">&times;</span>
+    <div id="modalBody"></div>
+  </div>
+</div>
+
+<script src="script.js" defer></script>
+</body>
+</html>

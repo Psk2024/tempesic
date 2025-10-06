@@ -1,0 +1,180 @@
+:root {
+  --primary-color: #0056b3;
+  --primary-hover: rgba(0, 86, 179, 0.15);
+  --highlight-bg: #ffd54f;
+  --highlight-color: #5d4300;
+  --font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  --border-radius: 12px;
+  --transition-fast: 0.15s ease;
+  --text-dark: #222;
+  --text-medium: #666;
+}
+
+body {
+  font-family: var(--font-family);
+  background: linear-gradient(to top left, #d9e7ff, #fff);
+  color: var(--text-dark);
+  margin: 0;
+  padding: 0;
+  text-align: center;
+}
+
+h1 {
+  margin: 25px 0 15px;
+  font-size: 2.4em;
+  color: var(--primary-color);
+  font-weight: 700;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+
+h2 {
+    font-size: 1.5em;
+    margin: 30px auto 10px;
+    width: 90%;
+    text-align: left;
+    padding-left: 10px;
+    border-bottom: 2px solid;
+}
+
+.controls {
+  margin: 25px 0;
+}
+
+select, input[type="search"] {
+  margin: 8px 6px;
+  padding: 12px 18px;
+  font-size: 18px;
+  border-radius: var(--border-radius);
+  border: 1.5px solid #a1a1a1;
+  outline: none;
+  box-shadow: 0 3px 8px rgba(0, 123, 255, 0.12);
+  transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.2s ease;
+}
+
+select:focus, input[type="search"]:focus {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 12px rgba(0, 86, 179, 0.6);
+  transform: scale(1.05);
+}
+
+table {
+  width: 90%;
+  margin: 10px auto 30px;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 8px 20px rgba(0, 86, 179, 0.15);
+  transition: opacity 0.4s ease-in-out;
+  overflow: hidden;
+}
+
+th, td {
+  padding: 14px 20px;
+  text-align: left;
+  font-weight: 500;
+  font-size: 16px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+th {
+  background-color: var(--primary-color);
+  color: #fff;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 700;
+}
+
+tr:nth-child(even) {
+  background-color: #f9faff;
+}
+
+.clickable-row {
+  cursor: pointer;
+  transition: background 0.3s ease, transform 0.3s ease;
+}
+
+.clickable-row:hover {
+  background-color: var(--primary-hover);
+  transform: scale(1.01);
+}
+
+mark {
+  background-color: var(--highlight-bg);
+  font-weight: 700;
+  color: var(--highlight-color);
+  transition: background-color var(--transition-fast);
+  padding: 0;
+}
+
+
+/* --- Modal Base Styles --- */
+.modal {
+  display: none; /* Keep as default, JS shows it */
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background-color: rgba(0,0,0,0.75);
+  backdrop-filter: blur(5px);
+  overflow: auto;
+  justify-content: center;
+  align-items: center; 
+  padding: 20px;
+}
+
+
+.modal-content {
+  background: #fff;
+  margin: 0 auto; 
+  padding: 25px 30px;
+  border-radius: 20px;
+  width: 100%;
+  max-width: 600px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  animation: slideDown 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+@keyframes slideDown {
+  from {
+    transform: translateY(-60px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.close-btn {
+  float: right;
+  font-size: 26px;
+  font-weight: bold;
+  cursor: pointer;
+  color: #444;
+  transition: color 0.3s ease;
+}
+
+.close-btn:hover {
+  color: #d32f2f;
+}
+
+/* --- Responsive Styles for main page elements --- */
+@media (max-width: 900px) {
+  table, th, td {
+    font-size: 14px;
+  }
+  .modal-content {
+    width: 90%;
+    padding: 20px 25px;
+  }
+}
+
+@media (max-width: 480px) {
+  h1 {
+    font-size: 1.6em;
+  }
+  select, input[type="search"] {
+    font-size: 16px;
+    padding: 10px 14px;
+  }
+}
