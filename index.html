@@ -1,36 +1,595 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>List of Officers/Officials</title>
-<link rel="stylesheet" href="styles.css" />
+  <meta charset="UTF-8">
+  <title>Employee Database (Online - Firestore)</title>
+
+  <!-- Firebase SDKs (compat version for simple usage) -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+
+  <style>
+    * { box-sizing: border-box; font-family: Arial, sans-serif; }
+    body { margin: 0; background: #f3f5fb; }
+    .app {
+      max-width: 1300px;
+      margin: 20px auto;
+      background: #ffffff;
+      border-radius: 8px;
+      padding: 20px 24px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    }
+    h1 { margin-top: 0; text-align: center; color: #1f3b70; }
+    .top-bar {
+      display: flex; justify-content: space-between; align-items: center;
+      gap: 10px; margin-bottom: 15px; flex-wrap: wrap;
+    }
+    .search-box input {
+      padding: 8px 10px; min-width: 260px; border-radius: 4px;
+      border: 1px solid #b8c4dd; outline: none;
+    }
+    .search-box input:focus {
+      border-color: #3955a4; box-shadow: 0 0 0 2px rgba(57,85,164,0.18);
+    }
+
+    .dash-card {
+      margin: 16px 0;
+      padding: 12px 14px;
+      border-radius: 6px;
+      border: 1px solid #dfe5ff;
+      background: #f6f8ff;
+    }
+    .dash-table-wrapper {
+      max-height: 260px;
+      overflow: auto;
+      border-radius: 4px;
+      border: 1px solid #d0d8ff;
+      background: #fff;
+    }
+    .dash-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+    .dash-table th, .dash-table td {
+      padding: 4px 6px;
+      border-bottom: 1px solid #edf0ff;
+      text-align: left;
+    }
+    .dash-table thead {
+      background: #e6ebff;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+
+    .form-card {
+      background: #f9fbff; border: 1px solid #dde5ff;
+      border-radius: 6px; padding: 10px 14px 14px; margin-bottom: 16px;
+    }
+    .form-grid {
+      display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px 12px;
+    }
+    @media (max-width: 1100px) { .form-grid { grid-template-columns: repeat(3, minmax(0,1fr)); } }
+    @media (max-width: 900px)  { .form-grid { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+    @media (max-width: 600px)  { .form-grid { grid-template-columns: 1fr; } }
+
+    .field label {
+      display: block; font-size: 12px; color: #445; margin-bottom: 2px;
+    }
+    .field input {
+      width: 100%; padding: 7px 9px; border-radius: 4px;
+      border: 1px solid #b8c4dd; outline: none; font-size: 13px;
+    }
+    .field input:focus {
+      border-color: #3955a4; box-shadow: 0 0 0 2px rgba(57,85,164,0.18);
+    }
+
+    .buttons { margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; }
+    button {
+      border-radius: 4px; border: none; padding: 7px 14px;
+      cursor: pointer; font-size: 13px;
+    }
+    .btn-primary  { background: #3955a4; color: #fff; }
+    .btn-secondary{ background: #e3e7f7; color: #222; }
+    .btn-danger   { background: #d9534f; color: #fff; }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 6px; }
+    thead { background: #e8edff; }
+    th, td {
+      padding: 6px 5px; border-bottom: 1px solid #d9e0f2; text-align: left;
+      vertical-align: top;
+    }
+    tbody tr:hover { background: #f0f4ff; cursor: pointer; }
+
+    .footer-note { margin-top: 8px; font-size: 11px; color: #666; text-align: right; }
+    .badge-edit {
+      font-size: 11px; padding: 2px 8px; border-radius: 20px;
+      background: #ffe9b0; color: #7f4a00; margin-left: 6px;
+    }
+    .status { font-size: 11px; color: #888; margin-left: 8px; }
+  </style>
 </head>
 <body>
-<header>
-  <h1>List of Officers/Officials
-  <div id="overallCountDisplay"></div>
-  </h1>
-</header>
+  <div class="app">
+    <h1>Employee Database (Online - Firestore)</h1>
 
-<main>
-  <section class="controls">
-    <select id="cadreSelect">
-      <option value="">All Branches</option>
-    </select>
-    <input type="search" id="searchInput" placeholder="Search employees..." />
-  </section>
-  <section id="employeeTableContainer" aria-live="polite">
-    </section>
-</main>
+    <div class="top-bar">
+      <div>
+        <strong>Total Employees:</strong> <span id="empCount">0</span>
+        <span class="status" id="statusText"></span>
+      </div>
+      <div class="search-box">
+        <input type="text" id="searchInput"
+               placeholder="Search by ID / Name / Designation / Branch / Contact..." />
+      </div>
+    </div>
 
-<div id="employeeModal" class="modal">
-  <div class="modal-content">
-    <span class="close-btn">&times;</span>
-    <div id="modalBody"></div>
+    <!-- Designation-wise Dashboard (table only) -->
+    <div class="dash-card">
+      <h3 style="margin:2px 0 8px;">Designation-wise Summary</h3>
+      <div class="dash-table-wrapper">
+        <table class="dash-table">
+          <thead>
+            <tr>
+              <th style="width:40px;">#</th>
+              <th>Designation</th>
+              <th>Employees</th>
+            </tr>
+          </thead>
+          <tbody id="dashBody">
+            <!-- Filled by JS -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="form-card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+        <strong>Employee Details</strong>
+        <span id="editBadge" class="badge-edit" style="display:none;">Editing existing record</span>
+      </div>
+
+      <div class="form-grid">
+        <div class="field">
+          <label for="empId">Emp ID *</label>
+          <input type="text" id="empId" />
+        </div>
+        <div class="field">
+          <label for="empName">Officer / Official Name *</label>
+          <input type="text" id="empName" />
+        </div>
+        <div class="field">
+          <label for="empDesignation">Designation</label>
+          <input type="text" id="empDesignation" />
+        </div>
+        <div class="field">
+          <label for="empGroup">Group</label>
+          <input type="text" id="empGroup" />
+        </div>
+        <div class="field">
+          <label for="empBranch">Branch</label>
+          <input type="text" id="empBranch" />
+        </div>
+        <div class="field">
+          <label for="empGender">Gender</label>
+          <input type="text" id="empGender" />
+        </div>
+        <div class="field">
+          <label for="empDob">DoB</label>
+          <input type="text" id="empDob" placeholder="dd-mm-yyyy" />
+        </div>
+        <div class="field">
+          <label for="empRetirement">Retirement</label>
+          <input type="text" id="empRetirement" placeholder="dd-mm-yyyy" />
+        </div>
+        <div class="field">
+          <label for="empDojBranch">DoJ (Branch)</label>
+          <input type="text" id="empDojBranch" placeholder="dd-mm-yyyy" />
+        </div>
+        <div class="field">
+          <label for="empDojAU">DoJ (Accounting Unit)</label>
+          <input type="text" id="empDojAU" placeholder="dd-mm-yyyy" />
+        </div>
+        <div class="field">
+          <label for="empContact">Contact Details</label>
+          <input type="text" id="empContact" />
+        </div>
+      </div>
+
+      <div class="buttons">
+        <button class="btn-primary" id="saveBtn">Save</button>
+        <button class="btn-secondary" id="clearBtn">Clear</button>
+        <button class="btn-danger" id="deleteBtn" disabled>Delete</button>
+
+        <!-- CSV Import -->
+        <button class="btn-secondary" id="importBtn" type="button">Import CSV</button>
+        <input type="file" id="csvFileInput" accept=".csv" style="display:none;">
+      </div>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th style="width:40px;">#</th>
+          <th>Emp ID</th>
+          <th>Name</th>
+          <th>Designation</th>
+          <th>Group</th>
+          <th>Branch</th>
+          <th>Gender</th>
+          <th>DoB</th>
+          <th>Retirement</th>
+          <th>DoJ (Branch)</th>
+          <th>DoJ (A.U.)</th>
+          <th>Contact</th>
+        </tr>
+      </thead>
+      <tbody id="empTableBody">
+        <!-- rows generated by JS -->
+      </tbody>
+    </table>
+
+    <div class="footer-note">
+      Data is stored online in Google Firebase Firestore (Project: empdb-2c5bb).
+    </div>
   </div>
-</div>
 
-<script src="script.js" defer></script>
+  <script>
+    // --- Your Firebase config (empdb-2c5bb) ---
+    const firebaseConfig = {
+      apiKey: "AIzaSyBl0JbugtktEVUP-Pdg6Rl0nzK9u10aN2c",
+      authDomain: "empdb-2c5bb.firebaseapp.com",
+      projectId: "empdb-2c5bb",
+      storageBucket: "empdb-2c5bb.firebasestorage.app",
+      messagingSenderId: "94024514062",
+      appId: "1:94024514062:web:431c9908b5f6afc1949a5f",
+      measurementId: "G-JX251BG0G2"
+    };
+
+    // Initialize Firebase (compat SDK)
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+    const empCollection = db.collection("employees");
+
+    // ---- State ----
+    let employees = [];
+    let editingId = null;
+
+    // ---- DOM ----
+    const empIdInput       = document.getElementById("empId");
+    const empNameInput     = document.getElementById("empName");
+    const empDesignationInput = document.getElementById("empDesignation");
+    const empGroupInput    = document.getElementById("empGroup");
+    const empBranchInput   = document.getElementById("empBranch");
+    const empGenderInput   = document.getElementById("empGender");
+    const empDobInput      = document.getElementById("empDob");
+    const empRetirementInput = document.getElementById("empRetirement");
+    const empDojBranchInput  = document.getElementById("empDojBranch");
+    const empDojAUInput      = document.getElementById("empDojAU");
+    const empContactInput    = document.getElementById("empContact");
+
+    const empTableBody   = document.getElementById("empTableBody");
+    const empCountLabel  = document.getElementById("empCount");
+    const searchInput    = document.getElementById("searchInput");
+    const saveBtn        = document.getElementById("saveBtn");
+    const clearBtn       = document.getElementById("clearBtn");
+    const deleteBtn      = document.getElementById("deleteBtn");
+    const editBadge      = document.getElementById("editBadge");
+    const statusText     = document.getElementById("statusText");
+    const importBtn      = document.getElementById("importBtn");
+    const csvFileInput   = document.getElementById("csvFileInput");
+    const dashBody       = document.getElementById("dashBody");
+
+    function setStatus(msg) {
+      statusText.textContent = msg || "";
+    }
+
+    // ---- Load data from Firestore ----
+    async function loadEmployees() {
+      try {
+        setStatus("Loading...");
+        const snapshot = await empCollection.orderBy("empId").get();
+        employees = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        renderTable();
+        updateDashboard();
+        setStatus("Loaded " + employees.length + " record(s).");
+      } catch (err) {
+        console.error("Error loading:", err);
+        setStatus("Error loading data. Check console.");
+        alert("Error loading data from Firestore.\n" + err.message);
+      }
+    }
+
+    // ---- Render main table ----
+    function renderTable() {
+      const search = (searchInput.value || "").toLowerCase().trim();
+      empTableBody.innerHTML = "";
+
+      let filtered = employees;
+      if (search) {
+        filtered = employees.filter(emp => {
+          return (
+            (emp.empId || "").toLowerCase().includes(search) ||
+            (emp.name || "").toLowerCase().includes(search) ||
+            (emp.designation || "").toLowerCase().includes(search) ||
+            (emp.branch || "").toLowerCase().includes(search) ||
+            (emp.contact || "").toLowerCase().includes(search)
+          );
+        });
+      }
+
+      filtered.forEach((emp, index) => {
+        const tr = document.createElement("tr");
+        tr.dataset.id = emp.id;
+
+        tr.innerHTML = `
+          <td>${index + 1}</td>
+          <td>${emp.empId || ""}</td>
+          <td>${emp.name || ""}</td>
+          <td>${emp.designation || ""}</td>
+          <td>${emp.group || ""}</td>
+          <td>${emp.branch || ""}</td>
+          <td>${emp.gender || ""}</td>
+          <td>${emp.dob || ""}</td>
+          <td>${emp.retirement || ""}</td>
+          <td>${emp.dojBranch || ""}</td>
+          <td>${emp.dojAU || ""}</td>
+          <td>${emp.contact || ""}</td>
+        `;
+
+        tr.addEventListener("click", () => {
+          startEditing(emp.id);
+        });
+
+        empTableBody.appendChild(tr);
+      });
+
+      empCountLabel.textContent = employees.length;
+    }
+
+    // ---- Designation-wise dashboard table ----
+    function updateDashboard() {
+      const counts = {};
+      employees.forEach(emp => {
+        const raw = emp.designation || "";
+        const key = raw.trim() || "(No Designation)";
+        counts[key] = (counts[key] || 0) + 1;
+      });
+
+      const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+
+      dashBody.innerHTML = "";
+      entries.forEach(([designation, count], idx) => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${idx + 1}</td>
+          <td>${designation}</td>
+          <td>${count}</td>
+        `;
+        dashBody.appendChild(tr);
+      });
+    }
+
+    // ---- Form helpers ----
+    function clearForm() {
+      empIdInput.value = "";
+      empNameInput.value = "";
+      empDesignationInput.value = "";
+      empGroupInput.value = "";
+      empBranchInput.value = "";
+      empGenderInput.value = "";
+      empDobInput.value = "";
+      empRetirementInput.value = "";
+      empDojBranchInput.value = "";
+      empDojAUInput.value = "";
+      empContactInput.value = "";
+
+      editingId = null;
+      deleteBtn.disabled = true;
+      editBadge.style.display = "none";
+      saveBtn.textContent = "Save";
+    }
+
+    function startEditing(id) {
+      const emp = employees.find(e => e.id === id);
+      if (!emp) return;
+
+      editingId = id;
+      empIdInput.value = emp.empId || "";
+      empNameInput.value = emp.name || "";
+      empDesignationInput.value = emp.designation || "";
+      empGroupInput.value = emp.group || "";
+      empBranchInput.value = emp.branch || "";
+      empGenderInput.value = emp.gender || "";
+      empDobInput.value = emp.dob || "";
+      empRetirementInput.value = emp.retirement || "";
+      empDojBranchInput.value = emp.dojBranch || "";
+      empDojAUInput.value = emp.dojAU || "";
+      empContactInput.value = emp.contact || "";
+
+      deleteBtn.disabled = false;
+      editBadge.style.display = "inline-block";
+      saveBtn.textContent = "Update";
+    }
+
+    // ---- Save (Add / Update) ----
+    async function handleSave() {
+      const empId = empIdInput.value.trim();
+      const name  = empNameInput.value.trim();
+
+      if (!empId || !name) {
+        alert("Emp ID and Name are mandatory.");
+        return;
+      }
+
+      const data = {
+        empId,
+        name,
+        designation: empDesignationInput.value.trim(),
+        group:       empGroupInput.value.trim(),
+        branch:      empBranchInput.value.trim(),
+        gender:      empGenderInput.value.trim(),
+        dob:         empDobInput.value.trim(),
+        retirement:  empRetirementInput.value.trim(),
+        dojBranch:   empDojBranchInput.value.trim(),
+        dojAU:       empDojAUInput.value.trim(),
+        contact:     empContactInput.value.trim()
+      };
+
+      try {
+        setStatus("Saving...");
+        if (editingId) {
+          await empCollection.doc(editingId).set(data, { merge: true });
+        } else {
+          await empCollection.add({
+            ...data,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+          });
+        }
+        await loadEmployees();
+        clearForm();
+        setStatus("Saved successfully.");
+      } catch (err) {
+        console.error("Error saving:", err);
+        alert("Error saving data.\n" + err.message);
+        setStatus("Error saving.");
+      }
+    }
+
+    // ---- Delete ----
+    async function handleDelete() {
+      if (!editingId) return;
+      if (!confirm("Are you sure you want to delete this record?")) return;
+
+      try {
+        setStatus("Deleting...");
+        await empCollection.doc(editingId).delete();
+        await loadEmployees();
+        clearForm();
+        setStatus("Deleted successfully.");
+      } catch (err) {
+        console.error("Error deleting:", err);
+        alert("Error deleting data.\n" + err.message);
+        setStatus("Error deleting.");
+      }
+    }
+
+    // ---- CSV Parsing (handles commas inside quotes) ----
+    function splitCsvRow(row) {
+      const result = [];
+      let current = "";
+      let inQuotes = false;
+
+      for (let i = 0; i < row.length; i++) {
+        const ch = row[i];
+
+        if (ch === '"') {
+          if (inQuotes && i + 1 < row.length && row[i + 1] === '"') {
+            current += '"';
+            i++;
+          } else {
+            inQuotes = !inQuotes;
+          }
+        } else if (ch === ',' && !inQuotes) {
+          result.push(current);
+          current = "";
+        } else {
+          current += ch;
+        }
+      }
+      result.push(current);
+      return result;
+    }
+
+    function parseCsv(text) {
+      const lines = text.split(/\r?\n/).filter(line => line.trim() !== "");
+      if (lines.length <= 1) return [];
+
+      const rows = [];
+      // Skip header line (0) – expects your header order
+      // A:Emp ID, B:Name, C:Category(ignored), D:Designation, E:Group, F:Branch,
+      // G:Gender, H:DoB, I:Retirement, J:DoJ(Branch), K:DoJ(AU), L:Contact
+      for (let i = 1; i < lines.length; i++) {
+        const cols = splitCsvRow(lines[i]);
+        if (cols.length === 0) continue;
+
+        rows.push({
+          empId:      (cols[0]  || "").trim(),
+          name:       (cols[1]  || "").trim(),
+          // cols[2] is Category -> ignored
+          designation:(cols[3]  || "").trim(),
+          group:      (cols[4]  || "").trim(),
+          branch:     (cols[5]  || "").trim(),
+          gender:     (cols[6]  || "").trim(),
+          dob:        (cols[7]  || "").trim(),
+          retirement: (cols[8]  || "").trim(),
+          dojBranch:  (cols[9]  || "").trim(),
+          dojAU:      (cols[10] || "").trim(),
+          contact:    (cols[11] || "").trim()
+        });
+      }
+      return rows;
+    }
+
+    function handleCsvFileChange(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      if (!confirm("Import employees from file: " + file.name + " ?")) {
+        event.target.value = "";
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const text = e.target.result;
+        const rows = parseCsv(text);
+
+        if (!rows.length) {
+          alert("No valid rows found in CSV.\nCheck that the first row is the header and data starts from second row.");
+          csvFileInput.value = "";
+          return;
+        }
+
+        try {
+          setStatus("Importing " + rows.length + " record(s)...");
+          for (const row of rows) {
+            if (!row.empId && !row.name) continue;
+            await empCollection.add({
+              ...row,
+              createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+          }
+          await loadEmployees();
+          setStatus("Imported " + rows.length + " record(s).");
+        } catch (err) {
+          console.error("Error importing CSV:", err);
+          alert("Error importing CSV.\n" + err.message);
+          setStatus("Error importing.");
+        } finally {
+          csvFileInput.value = "";
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    // ---- Events ----
+    saveBtn.addEventListener("click", handleSave);
+    clearBtn.addEventListener("click", clearForm);
+    deleteBtn.addEventListener("click", handleDelete);
+    searchInput.addEventListener("input", renderTable);
+
+    importBtn.addEventListener("click", () => csvFileInput.click());
+    csvFileInput.addEventListener("change", handleCsvFileChange);
+
+    // ---- Init ----
+    loadEmployees();
+  </script>
 </body>
 </html>
