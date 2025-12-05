@@ -1,0 +1,986 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Employee Database (Online - Firestore)</title>
+
+  <!-- Firebase SDKs (compat version for simple usage) -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+
+  <style>
+    * { box-sizing: border-box; font-family: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif; }
+    body {
+      margin: 0;
+      background: radial-gradient(circle at top left, #e0ebff 0, #f5f7ff 40%, #f3f5fb 100%);
+      color: #1b2340;
+    }
+    .app {
+      max-width: 1300px;
+      margin: 24px auto;
+      background: #ffffff;
+      border-radius: 14px;
+      padding: 22px 26px 20px;
+      box-shadow: 0 14px 35px rgba(15, 23, 42, 0.12);
+      border: 1px solid rgba(148, 163, 184, 0.3);
+    }
+    h1 {
+      margin: 0 0 14px;
+      text-align: center;
+      color: #111827;
+      letter-spacing: 0.02em;
+      font-weight: 700;
+      font-size: 24px;
+    }
+
+    .top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 18px;
+      flex-wrap: wrap;
+    }
+    .top-bar-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      font-size: 13px;
+    }
+    .top-bar-left strong {
+      font-weight: 600;
+    }
+    .search-box input {
+      padding: 8px 10px;
+      min-width: 260px;
+      border-radius: 999px;
+      border: 1px solid #cbd5f5;
+      outline: none;
+      font-size: 13px;
+      background: #f9fafb;
+    }
+    .search-box input:focus {
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25);
+      background: #ffffff;
+    }
+
+    .dash-card {
+      margin: 12px 0 18px;
+      padding: 12px 14px 14px;
+      border-radius: 12px;
+      border: 1px solid rgba(191, 219, 254, 0.9);
+      background: linear-gradient(135deg, #eff6ff, #f5f3ff);
+    }
+    .dash-card h3 {
+      margin: 0 0 8px;
+      font-size: 14px;
+      font-weight: 600;
+      color: #1d4ed8;
+    }
+
+    /* Group summary cards row */
+    .dash-card-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 4px;
+    }
+    .dash-summary-card {
+      min-width: 140px;
+      padding: 8px 11px;
+      border-radius: 10px;
+      background: #ffffff;
+      border: 1px solid rgba(129, 140, 248, 0.4);
+      box-shadow: 0 4px 10px rgba(148, 163, 184, 0.25);
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .dash-summary-card-title {
+      font-size: 11px;
+      font-weight: 600;
+      color: #4b5563;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    .dash-summary-card-count {
+      font-size: 18px;
+      font-weight: 700;
+      color: #1d4ed8;
+    }
+
+    .form-card {
+      background: #f9fbff;
+      border: 1px solid #e0e7ff;
+      border-radius: 10px;
+      padding: 10px 14px 14px;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px 12px;
+    }
+    @media (max-width: 1100px) { .form-grid { grid-template-columns: repeat(3, minmax(0,1fr)); } }
+    @media (max-width: 900px)  { .form-grid { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+    @media (max-width: 650px)  { .form-grid { grid-template-columns: 1fr; } }
+
+    .field label {
+      display: block;
+      font-size: 12px;
+      color: #4b5563;
+      margin-bottom: 3px;
+      font-weight: 500;
+    }
+    .field input,
+    .field select {
+      width: 100%;
+      padding: 7px 9px;
+      border-radius: 6px;
+      border: 1px solid #cbd5f5;
+      outline: none;
+      font-size: 13px;
+      background: #ffffff;
+      transition: border-color 0.12s, box-shadow 0.12s, background 0.12s;
+    }
+    .field input:focus,
+    .field select:focus {
+      border-color: #2563eb;
+      box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.18);
+      background: #f9fafb;
+    }
+
+    .buttons {
+      margin-top: 12px;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    button {
+      border-radius: 999px;
+      border: none;
+      padding: 7px 16px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: transform 0.08s ease, box-shadow 0.1s ease, background 0.1s ease;
+    }
+    button:active {
+      transform: translateY(1px);
+      box-shadow: none !important;
+    }
+    .btn-primary  {
+      background: linear-gradient(135deg, #2563eb, #1d4ed8);
+      color: #fff;
+      box-shadow: 0 6px 14px rgba(37, 99, 235, 0.35);
+    }
+    .btn-primary:hover { background: linear-gradient(135deg, #1d4ed8, #1e40af); }
+    .btn-secondary{
+      background: #e5edff;
+      color: #111827;
+      box-shadow: 0 4px 10px rgba(148, 163, 184, 0.3);
+    }
+    .btn-secondary:hover { background: #dbe5ff; }
+    .btn-danger   {
+      background: #ef4444;
+      color: #fff;
+      box-shadow: 0 4px 10px rgba(239, 68, 68, 0.45);
+    }
+    .btn-danger:hover { background: #dc2626; }
+    .btn-small    { padding: 4px 10px; font-size: 11px; }
+    .btn-ghost {
+      background: #f9fafb;
+      border: 1px solid #d1d5db;
+      color: #111827;
+      box-shadow: none;
+      border-radius: 999px;
+    }
+    .btn-ghost:hover { background: #e5e7eb; }
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+
+    /* Table */
+    .table-wrapper {
+      border-radius: 10px;
+      border: 1px solid #e5e7eb;
+      overflow: hidden;
+      background: #ffffff;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+    thead {
+      background: linear-gradient(135deg, #eff6ff, #e5e7eb);
+    }
+    th,
+    td {
+      padding: 6px 6px;
+      border-bottom: 1px solid #e5e7eb;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      font-weight: 600;
+      color: #374151;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      white-space: nowrap;
+    }
+    tbody tr:nth-child(even) {
+      background: #f9fafb;
+    }
+    tbody tr:hover {
+      background: #edf2ff;
+    }
+
+    .footer-note {
+      margin-top: 10px;
+      font-size: 11px;
+      color: #6b7280;
+      text-align: right;
+    }
+    .badge-edit {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: #fbbf24;
+      color: #78350f;
+      margin-left: 6px;
+    }
+    .status {
+      font-size: 11px;
+      color: #6b7280;
+      margin-left: 8px;
+    }
+
+    /* Modal / Popup styles */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.45);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 10px;
+      z-index: 1000;
+    }
+    .modal-overlay.active {
+      display: flex;
+    }
+    .modal {
+      background: #fff;
+      border-radius: 14px;
+      max-width: 960px;
+      width: 100%;
+      box-shadow: 0 20px 45px rgba(15,23,42,0.35);
+      position: relative;
+      border: 1px solid rgba(209, 213, 219, 0.8);
+    }
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 16px 6px;
+      border-bottom: 1px solid #e5e7eb;
+      background: linear-gradient(135deg, #eff6ff, #eef2ff);
+      border-radius: 14px 14px 0 0;
+    }
+    .modal-title {
+      font-weight: 600;
+      color: #1f2937;
+      font-size: 14px;
+    }
+    .modal-close {
+      background: transparent;
+      border: none;
+      font-size: 18px;
+      cursor: pointer;
+      line-height: 1;
+      color: #4b5563;
+    }
+
+    #modalStatus {
+      font-size: 11px;
+      color: #4b5563;
+      margin-top: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <h1>Employee Database (Online - Firestore)</h1>
+
+    <div class="top-bar">
+      <div class="top-bar-left">
+        <div>
+          <strong>Total Employees:</strong> <span id="empCount">0</span>
+          <span class="status" id="statusText"></span>
+        </div>
+        <button class="btn-primary btn-small" id="addEmpBtn">+ Add Employee</button>
+      </div>
+      <div class="search-box">
+        <input type="text" id="searchInput"
+               placeholder="Search by ID / Name / Group / Branch / Contact / Status / Date..." />
+      </div>
+    </div>
+
+    <!-- Group-wise Dashboard (cards) -->
+    <div class="dash-card">
+      <h3>Group-wise Summary</h3>
+      <div class="dash-card-row" id="dashCardRow">
+        <!-- Filled by JS -->
+      </div>
+    </div>
+
+    <!-- MAIN TABLE -->
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:40px;">#</th>
+            <th>Emp ID</th>
+            <th>Name</th>
+            <th>Designation</th>
+            <th>Group</th>
+            <th>Branch</th>
+            <th>Gender</th>
+            <th>DoB</th>
+            <th>Retirement</th>
+            <th>DoJ (Branch)</th>
+            <th>DoJ (A.U.)</th>
+            <th>Contact</th>
+            <th>Probation Status</th>
+            <th>Probation Date</th>
+            <th>Character Status</th>
+            <th>Character Date</th>
+            <th>Caste Status</th>
+            <th>Caste Date</th>
+            <th>Confirmation Status</th>
+            <th>Confirmation Date</th>
+            <th style="width:110px;">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="empTableBody">
+          <!-- rows generated by JS -->
+        </tbody>
+      </table>
+    </div>
+
+    <div class="footer-note">
+      Data is stored online in Google Firebase Firestore (Project: empdb-2c5bb).
+    </div>
+  </div>
+
+  <!-- POPUP / MODAL FOR ADD / EDIT EMPLOYEE -->
+  <div id="modalOverlay" class="modal-overlay">
+    <div class="modal">
+      <div class="modal-header">
+        <span class="modal-title" id="modalTitle">Add Employee</span>
+        <button class="modal-close" id="modalCloseBtn" title="Close">&times;</button>
+      </div>
+      <div class="form-card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+          <strong style="font-size:13px;">Employee Details</strong>
+          <span id="editBadge" class="badge-edit" style="display:none;">Editing existing record</span>
+        </div>
+
+        <div class="form-grid">
+          <!-- Basic details -->
+          <div class="field">
+            <label for="empId">Emp ID *</label>
+            <input type="text" id="empId" />
+          </div>
+          <div class="field">
+            <label for="empName">Officer / Official Name *</label>
+            <input type="text" id="empName" />
+          </div>
+          <div class="field">
+            <label for="empDesignation">Designation</label>
+            <input type="text" id="empDesignation" />
+          </div>
+          <div class="field">
+            <label for="empGroup">Group</label>
+            <input type="text" id="empGroup" />
+          </div>
+          <div class="field">
+            <label for="empBranch">Branch</label>
+            <input type="text" id="empBranch" />
+          </div>
+          <div class="field">
+            <label for="empGender">Gender</label>
+            <input type="text" id="empGender" />
+          </div>
+          <div class="field">
+            <label for="empDob">DoB</label>
+            <input type="text" id="empDob" placeholder="dd-mm-yyyy" />
+          </div>
+          <div class="field">
+            <label for="empRetirement">Retirement</label>
+            <input type="text" id="empRetirement" placeholder="dd-mm-yyyy" />
+          </div>
+          <div class="field">
+            <label for="empDojBranch">DoJ (Branch)</label>
+            <input type="text" id="empDojBranch" placeholder="dd-mm-yyyy" />
+          </div>
+          <div class="field">
+            <label for="empDojAU">DoJ (Accounting Unit)</label>
+            <input type="text" id="empDojAU" placeholder="dd-mm-yyyy" />
+          </div>
+          <div class="field">
+            <label for="empContact">Contact Details</label>
+            <input type="text" id="empContact" />
+          </div>
+
+          <!-- Status + dates -->
+          <div class="field">
+            <label for="empProbationStatus">Probation Status</label>
+            <select id="empProbationStatus">
+              <option value="">-- Select --</option>
+              <option value="Pending">Pending</option>
+              <option value="Completed">Completed</option>
+              <option value="Not Applicable">Not Applicable</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="empProbationDate">Probation Date</label>
+            <input type="text" id="empProbationDate" placeholder="dd-mm-yyyy" />
+          </div>
+
+          <div class="field">
+            <label for="empCharacterStatus">Character Verification Status</label>
+            <select id="empCharacterStatus">
+              <option value="">-- Select --</option>
+              <option value="Pending">Pending</option>
+              <option value="Completed">Completed</option>
+              <option value="Not Applicable">Not Applicable</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="empCharacterDate">Character Verification Date</label>
+            <input type="text" id="empCharacterDate" placeholder="dd-mm-yyyy" />
+          </div>
+
+          <div class="field">
+            <label for="empCasteStatus">Caste Verification Status</label>
+            <select id="empCasteStatus">
+              <option value="">-- Select --</option>
+              <option value="Pending">Pending</option>
+              <option value="Completed">Completed</option>
+              <option value="Not Applicable">Not Applicable</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="empCasteDate">Caste Verification Date</label>
+            <input type="text" id="empCasteDate" placeholder="dd-mm-yyyy" />
+          </div>
+
+          <div class="field">
+            <label for="empConfirmationStatus">Confirmation Status</label>
+            <select id="empConfirmationStatus">
+              <option value="">-- Select --</option>
+              <option value="Pending">Pending</option>
+              <option value="Completed">Completed</option>
+              <option value="Not Applicable">Not Applicable</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="empConfirmationDate">Confirmation Date</label>
+            <input type="text" id="empConfirmationDate" placeholder="dd-mm-yyyy" />
+          </div>
+        </div>
+
+        <div class="buttons">
+          <button class="btn-primary" id="saveBtn">Save</button>
+          <button class="btn-secondary" id="clearBtn" type="button">Clear</button>
+          <button class="btn-danger" id="deleteBtn" disabled>Delete</button>
+
+          <!-- CSV Import -->
+          <button class="btn-secondary" id="importBtn" type="button">Import CSV</button>
+          <input type="file" id="csvFileInput" accept=".csv" style="display:none;">
+        </div>
+
+        <div id="modalStatus" class="status"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // --- Firebase config ---
+    const firebaseConfig = {
+      apiKey: "AIzaSyBl0JbugtktEVUP-Pdg6Rl0nzK9u10aN2c",
+      authDomain: "empdb-2c5bb.firebaseapp.com",
+      projectId: "empdb-2c5bb",
+      storageBucket: "empdb-2c5bb.appspot.com", // unused now but ok
+      messagingSenderId: "94024514062",
+      appId: "1:94024514062:web:431c9908b5f6afc1949a5f",
+      measurementId: "G-JX251BG0G2"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+    const empCollection = db.collection("employees");
+
+    // ---- State ----
+    let employees = [];
+    let editingId = null;
+
+    // ---- DOM ----
+    const empIdInput       = document.getElementById("empId");
+    const empNameInput     = document.getElementById("empName");
+    const empDesignationInput = document.getElementById("empDesignation");
+    const empGroupInput    = document.getElementById("empGroup");
+    const empBranchInput   = document.getElementById("empBranch");
+    const empGenderInput   = document.getElementById("empGender");
+    const empDobInput      = document.getElementById("empDob");
+    const empRetirementInput = document.getElementById("empRetirement");
+    const empDojBranchInput  = document.getElementById("empDojBranch");
+    const empDojAUInput      = document.getElementById("empDojAU");
+    const empContactInput    = document.getElementById("empContact");
+
+    const empProbationStatusInput   = document.getElementById("empProbationStatus");
+    const empCharacterStatusInput   = document.getElementById("empCharacterStatus");
+    const empCasteStatusInput       = document.getElementById("empCasteStatus");
+    const empConfirmationStatusInput= document.getElementById("empConfirmationStatus");
+
+    const empProbationDateInput     = document.getElementById("empProbationDate");
+    const empCharacterDateInput     = document.getElementById("empCharacterDate");
+    const empCasteDateInput         = document.getElementById("empCasteDate");
+    const empConfirmationDateInput  = document.getElementById("empConfirmationDate");
+
+    const empTableBody   = document.getElementById("empTableBody");
+    const empCountLabel  = document.getElementById("empCount");
+    const searchInput    = document.getElementById("searchInput");
+    const saveBtn        = document.getElementById("saveBtn");
+    const clearBtn       = document.getElementById("clearBtn");
+    const deleteBtn      = document.getElementById("deleteBtn");
+    const editBadge      = document.getElementById("editBadge");
+    const statusText     = document.getElementById("statusText");
+    const importBtn      = document.getElementById("importBtn");
+    const csvFileInput   = document.getElementById("csvFileInput");
+    const dashCardRow    = document.getElementById("dashCardRow");
+
+    const addEmpBtn      = document.getElementById("addEmpBtn");
+    const modalOverlay   = document.getElementById("modalOverlay");
+    const modalCloseBtn  = document.getElementById("modalCloseBtn");
+    const modalTitle     = document.getElementById("modalTitle");
+    const modalStatus    = document.getElementById("modalStatus");
+
+    function setStatus(msg) {
+      statusText.textContent = msg || "";
+    }
+    function setModalStatus(msg) {
+      if (modalStatus) modalStatus.textContent = msg || "";
+    }
+
+    // ---- Modal helpers ----
+    function openForm(isEdit) {
+      modalOverlay.classList.add("active");
+      modalTitle.textContent = isEdit ? "Edit Employee" : "Add Employee";
+      setModalStatus("");
+    }
+    function closeForm() { modalOverlay.classList.remove("active"); }
+
+    // ---- Load data ----
+    async function loadEmployees() {
+      try {
+        setStatus("Loading...");
+        const snapshot = await empCollection.orderBy("empId").get();
+        employees = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        renderTable();
+        updateDashboard();
+        setStatus("Loaded " + employees.length + " record(s).");
+      } catch (err) {
+        console.error("Error loading:", err);
+        setStatus("Error loading data. Check console.");
+        alert("Error loading data from Firestore.\n" + err.message);
+      }
+    }
+
+    // ---- Render table ----
+    function renderTable() {
+      const search = (searchInput.value || "").toLowerCase().trim();
+      empTableBody.innerHTML = "";
+      let filtered = employees;
+
+      if (search) {
+        filtered = employees.filter(emp => (
+          (emp.empId || "").toLowerCase().includes(search) ||
+          (emp.name || "").toLowerCase().includes(search) ||
+          (emp.designation || "").toLowerCase().includes(search) ||
+          (emp.group || "").toLowerCase().includes(search) ||
+          (emp.branch || "").toLowerCase().includes(search) ||
+          (emp.contact || "").toLowerCase().includes(search) ||
+          (emp.probationStatus || "").toLowerCase().includes(search) ||
+          (emp.characterStatus || "").toLowerCase().includes(search) ||
+          (emp.casteStatus || "").toLowerCase().includes(search) ||
+          (emp.confirmationStatus || "").toLowerCase().includes(search) ||
+          (emp.probationDate || "").toLowerCase().includes(search) ||
+          (emp.characterDate || "").toLowerCase().includes(search) ||
+          (emp.casteDate || "").toLowerCase().includes(search) ||
+          (emp.confirmationDate || "").toLowerCase().includes(search)
+        ));
+      }
+
+      filtered.forEach((emp, index) => {
+        const tr = document.createElement("tr");
+        tr.dataset.id = emp.id;
+        tr.innerHTML = `
+          <td>${index + 1}</td>
+          <td>${emp.empId || ""}</td>
+          <td>${emp.name || ""}</td>
+          <td>${emp.designation || ""}</td>
+          <td>${emp.group || ""}</td>
+          <td>${emp.branch || ""}</td>
+          <td>${emp.gender || ""}</td>
+          <td>${emp.dob || ""}</td>
+          <td>${emp.retirement || ""}</td>
+          <td>${emp.dojBranch || ""}</td>
+          <td>${emp.dojAU || ""}</td>
+          <td>${emp.contact || ""}</td>
+          <td>${emp.probationStatus || ""}</td>
+          <td>${emp.probationDate || ""}</td>
+          <td>${emp.characterStatus || ""}</td>
+          <td>${emp.characterDate || ""}</td>
+          <td>${emp.casteStatus || ""}</td>
+          <td>${emp.casteDate || ""}</td>
+          <td>${emp.confirmationStatus || ""}</td>
+          <td>${emp.confirmationDate || ""}</td>
+          <td>
+            <button class="btn-ghost btn-small edit-btn" type="button">Edit</button>
+            <button class="btn-danger btn-small row-del-btn" type="button">Del</button>
+          </td>
+        `;
+        tr.querySelector(".edit-btn").addEventListener("click", e => {
+          e.stopPropagation();
+          startEditing(emp.id);
+          openForm(true);
+        });
+        tr.querySelector(".row-del-btn").addEventListener("click", e => {
+          e.stopPropagation();
+          handleRowDelete(emp.id);
+        });
+        empTableBody.appendChild(tr);
+      });
+
+      empCountLabel.textContent = employees.length;
+    }
+
+    // ---- Group-wise Dashboard ----
+    function updateDashboard() {
+      const counts = {};
+      employees.forEach(emp => {
+        const key = (emp.group || "").trim() || "(No Group)";
+        counts[key] = (counts[key] || 0) + 1;
+      });
+      const entries = Object.entries(counts).sort((a, b) => a[0].localeCompare(b[0]));
+
+      dashCardRow.innerHTML = "";
+      entries.forEach(([group, count]) => {
+        const card = document.createElement("div");
+        card.className = "dash-summary-card";
+        card.innerHTML = `
+          <div class="dash-summary-card-title">${group}</div>
+          <div class="dash-summary-card-count">${count}</div>
+        `;
+        dashCardRow.appendChild(card);
+      });
+    }
+
+    // ---- Clear form ----
+    function clearForm() {
+      empIdInput.value = "";
+      empNameInput.value = "";
+      empDesignationInput.value = "";
+      empGroupInput.value = "";
+      empBranchInput.value = "";
+      empGenderInput.value = "";
+      empDobInput.value = "";
+      empRetirementInput.value = "";
+      empDojBranchInput.value = "";
+      empDojAUInput.value = "";
+      empContactInput.value = "";
+
+      empProbationStatusInput.value = "";
+      empCharacterStatusInput.value = "";
+      empCasteStatusInput.value = "";
+      empConfirmationStatusInput.value = "";
+
+      empProbationDateInput.value = "";
+      empCharacterDateInput.value = "";
+      empCasteDateInput.value = "";
+      empConfirmationDateInput.value = "";
+
+      editingId = null;
+      deleteBtn.disabled = true;
+      editBadge.style.display = "none";
+      saveBtn.textContent = "Save";
+      saveBtn.disabled = false;
+      setModalStatus("");
+      modalTitle.textContent = "Add Employee";
+    }
+
+    // ---- Start editing ----
+    function startEditing(id) {
+      const emp = employees.find(e => e.id === id);
+      if (!emp) return;
+
+      editingId = id;
+      empIdInput.value = emp.empId || "";
+      empNameInput.value = emp.name || "";
+      empDesignationInput.value = emp.designation || "";
+      empGroupInput.value = emp.group || "";
+      empBranchInput.value = emp.branch || "";
+      empGenderInput.value = emp.gender || "";
+      empDobInput.value = emp.dob || "";
+      empRetirementInput.value = emp.retirement || "";
+      empDojBranchInput.value = emp.dojBranch || "";
+      empDojAUInput.value = emp.dojAU || "";
+      empContactInput.value = emp.contact || "";
+
+      empProbationStatusInput.value    = emp.probationStatus    || "";
+      empCharacterStatusInput.value    = emp.characterStatus    || "";
+      empCasteStatusInput.value        = emp.casteStatus        || "";
+      empConfirmationStatusInput.value = emp.confirmationStatus || "";
+
+      empProbationDateInput.value     = emp.probationDate     || "";
+      empCharacterDateInput.value     = emp.characterDate     || "";
+      empCasteDateInput.value         = emp.casteDate         || "";
+      empConfirmationDateInput.value  = emp.confirmationDate  || "";
+
+      deleteBtn.disabled = false;
+      editBadge.style.display = "inline-block";
+      saveBtn.textContent = "Update";
+      saveBtn.disabled = false;
+      setModalStatus("");
+      modalTitle.textContent = "Edit Employee";
+    }
+
+    // ---- Save (Add / Update) ----
+    async function handleSave() {
+      const empId = empIdInput.value.trim();
+      const name  = empNameInput.value.trim();
+
+      if (!empId || !name) {
+        alert("Emp ID and Name are mandatory.");
+        return;
+      }
+
+      const data = {
+        empId,
+        name,
+        designation:     empDesignationInput.value.trim(),
+        group:           empGroupInput.value.trim(),
+        branch:          empBranchInput.value.trim(),
+        gender:          empGenderInput.value.trim(),
+        dob:             empDobInput.value.trim(),
+        retirement:      empRetirementInput.value.trim(),
+        dojBranch:       empDojBranchInput.value.trim(),
+        dojAU:           empDojAUInput.value.trim(),
+        contact:         empContactInput.value.trim(),
+        probationStatus: empProbationStatusInput.value,
+        characterStatus: empCharacterStatusInput.value,
+        casteStatus:     empCasteStatusInput.value,
+        confirmationStatus: empConfirmationStatusInput.value,
+        probationDate:   empProbationDateInput.value.trim(),
+        characterDate:   empCharacterDateInput.value.trim(),
+        casteDate:       empCasteDateInput.value.trim(),
+        confirmationDate:empConfirmationDateInput.value.trim()
+      };
+
+      // Disable save button and show status
+      saveBtn.disabled = true;
+      saveBtn.textContent = editingId ? "Updating..." : "Saving...";
+      setModalStatus("Saving to database...");
+
+      try {
+        if (editingId) {
+          await empCollection.doc(editingId).set(data, { merge: true });
+        } else {
+          await empCollection.add({
+            ...data,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+          });
+        }
+
+        setModalStatus("Reloading data...");
+        await loadEmployees();
+
+        alert("Record saved successfully.");
+        clearForm();
+        closeForm();
+        setModalStatus("");
+      } catch (err) {
+        console.error("Error saving:", err);
+        alert("Error saving data.\n" + err.message);
+        setModalStatus("Error saving.");
+      }
+
+      // Re-enable save button
+      saveBtn.disabled = false;
+      saveBtn.textContent = "Save";
+    }
+
+    // ---- Delete ----
+    async function handleDelete() {
+      if (!editingId) return;
+      if (!confirm("Are you sure you want to delete this record?")) return;
+
+      try {
+        setStatus("Deleting...");
+        await empCollection.doc(editingId).delete();
+        await loadEmployees();
+        clearForm();
+        closeForm();
+        setStatus("Deleted successfully.");
+      } catch (err) {
+        console.error("Error deleting:", err);
+        alert("Error deleting data.\n" + err.message);
+        setStatus("Error deleting.");
+      }
+    }
+
+    async function handleRowDelete(id) {
+      if (!id) return;
+      if (!confirm("Are you sure you want to delete this record?")) return;
+
+      try {
+        setStatus("Deleting...");
+        await empCollection.doc(id).delete();
+        await loadEmployees();
+        setStatus("Deleted successfully.");
+      } catch (err) {
+        console.error("Error deleting:", err);
+        alert("Error deleting data.\n" + err.message);
+        setStatus("Error deleting.");
+      }
+    }
+
+    // ---- CSV helpers (with 4 date columns) ----
+    function splitCsvRow(row) {
+      const result = [];
+      let current = "";
+      let inQuotes = false;
+      for (let i = 0; i < row.length; i++) {
+        const ch = row[i];
+        if (ch === '"') {
+          if (inQuotes && i + 1 < row.length && row[i + 1] === '"') {
+            current += '"'; i++;
+          } else inQuotes = !inQuotes;
+        } else if (ch === ',' && !inQuotes) {
+          result.push(current); current = "";
+        } else current += ch;
+      }
+      result.push(current);
+      return result;
+    }
+
+    function parseCsv(text) {
+      const lines = text.split(/\r?\n/).filter(l => l.trim() !== "");
+      if (lines.length <= 1) return [];
+      const rows = [];
+      // 0:Emp ID, 1:Name, 2:Category(ignored), 3:Designation, 4:Group,
+      // 5:Branch, 6:Gender, 7:DoB, 8:Retirement, 9:DoJ(Branch),
+      // 10:DoJ(AU), 11:Contact,
+      // 12:ProbationStatus, 13:CharacterStatus, 14:CasteStatus, 15:ConfirmationStatus,
+      // 16:ProbationDate, 17:CharacterDate, 18:CasteDate, 19:ConfirmationDate
+      for (let i = 1; i < lines.length; i++) {
+        const cols = splitCsvRow(lines[i]);
+        if (!cols.length) continue;
+        rows.push({
+          empId:              (cols[0]  || "").trim(),
+          name:               (cols[1]  || "").trim(),
+          designation:        (cols[3]  || "").trim(),
+          group:              (cols[4]  || "").trim(),
+          branch:             (cols[5]  || "").trim(),
+          gender:             (cols[6]  || "").trim(),
+          dob:                (cols[7]  || "").trim(),
+          retirement:         (cols[8]  || "").trim(),
+          dojBranch:          (cols[9]  || "").trim(),
+          dojAU:              (cols[10] || "").trim(),
+          contact:            (cols[11] || "").trim(),
+          probationStatus:    (cols[12] || "").trim(),
+          characterStatus:    (cols[13] || "").trim(),
+          casteStatus:        (cols[14] || "").trim(),
+          confirmationStatus: (cols[15] || "").trim(),
+          probationDate:      (cols[16] || "").trim(),
+          characterDate:      (cols[17] || "").trim(),
+          casteDate:          (cols[18] || "").trim(),
+          confirmationDate:   (cols[19] || "").trim()
+        });
+      }
+      return rows;
+    }
+
+    function handleCsvFileChange(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      if (!confirm("Import employees from file: " + file.name + " ?")) {
+        event.target.value = "";
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = async e => {
+        const text = e.target.result;
+        const rows = parseCsv(text);
+        if (!rows.length) {
+          alert("No valid rows found in CSV.");
+          csvFileInput.value = "";
+          return;
+        }
+        try {
+          setStatus("Importing " + rows.length + " record(s)...");
+          for (const row of rows) {
+            if (!row.empId && !row.name) continue;
+            await empCollection.add({
+              ...row,
+              createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+          }
+          await loadEmployees();
+          setStatus("Imported " + rows.length + " record(s).");
+        } catch (err) {
+          console.error("Error importing CSV:", err);
+          alert("Error importing CSV.\n" + err.message);
+          setStatus("Error importing.");
+        } finally {
+          csvFileInput.value = "";
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    // ---- Events ----
+    saveBtn.addEventListener("click", handleSave);
+    clearBtn.addEventListener("click", clearForm);
+    deleteBtn.addEventListener("click", handleDelete);
+    searchInput.addEventListener("input", renderTable);
+
+    importBtn.addEventListener("click", () => csvFileInput.click());
+    csvFileInput.addEventListener("change", handleCsvFileChange);
+
+    addEmpBtn.addEventListener("click", () => { clearForm(); openForm(false); });
+    modalCloseBtn.addEventListener("click", () => { closeForm(); });
+
+    modalOverlay.addEventListener("click", e => { if (e.target === modalOverlay) closeForm(); });
+
+    // ---- Init ----
+    loadEmployees();
+  </script>
+</body>
+</html>
