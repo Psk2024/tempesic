@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Employee Database</title>
+  <title>Employee Database (Online - Firestore)</title>
 
   <!-- Firebase SDKs (compat version for simple usage) -->
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
@@ -160,7 +160,7 @@
       align-items: center;
       justify-content: space-between;
       padding: 10px 14px 6px;
-      border-bottom: 1px solid #dde3ff;
+      border-bottom: 1px solid #dde5ff;
     }
     .modal-title {
       font-weight: bold;
@@ -313,7 +313,7 @@
           </div>
           <div class="field">
             <label for="probationDocInput">Probation Document (required if Completed)</label>
-            <input type="file" id="probationDocInput" accept=".pdf"/>
+            <input type="file" id="probationDocInput" accept=".pdf,.jpg,.jpeg,.png" />
             <div id="probationDocInfo" class="doc-info" style="display:none;">
               Existing:
               <a id="probationDocLink" href="#" target="_blank"></a>
@@ -332,7 +332,7 @@
           </div>
           <div class="field">
             <label for="characterDocInput">Character Verification Document (required if Completed)</label>
-            <input type="file" id="characterDocInput" />
+            <input type="file" id="characterDocInput" accept=".pdf,.jpg,.jpeg,.png" />
             <div id="characterDocInfo" class="doc-info" style="display:none;">
               Existing:
               <a id="characterDocLink" href="#" target="_blank"></a>
@@ -351,7 +351,7 @@
           </div>
           <div class="field">
             <label for="casteDocInput">Caste Verification Document (required if Completed)</label>
-            <input type="file" id="casteDocInput" />
+            <input type="file" id="casteDocInput" accept=".pdf,.jpg,.jpeg,.png" />
             <div id="casteDocInfo" class="doc-info" style="display:none;">
               Existing:
               <a id="casteDocLink" href="#" target="_blank"></a>
@@ -370,7 +370,7 @@
           </div>
           <div class="field">
             <label for="confirmationDocInput">Confirmation Document (required if Completed)</label>
-            <input type="file" id="confirmationDocInput" />
+            <input type="file" id="confirmationDocInput" accept=".pdf,.jpg,.jpeg,.png" />
             <div id="confirmationDocInfo" class="doc-info" style="display:none;">
               Existing:
               <a id="confirmationDocLink" href="#" target="_blank"></a>
@@ -387,6 +387,9 @@
           <button class="btn-secondary" id="importBtn" type="button">Import CSV</button>
           <input type="file" id="csvFileInput" accept=".csv" style="display:none;">
         </div>
+
+        <!-- Status text inside modal -->
+        <div id="modalStatus" class="status" style="margin-top:4px;"></div>
       </div>
     </div>
   </div>
@@ -468,15 +471,20 @@
     const modalOverlay   = document.getElementById("modalOverlay");
     const modalCloseBtn  = document.getElementById("modalCloseBtn");
     const modalTitle     = document.getElementById("modalTitle");
+    const modalStatus    = document.getElementById("modalStatus");
 
     function setStatus(msg) {
       statusText.textContent = msg || "";
+    }
+    function setModalStatus(msg) {
+      if (modalStatus) modalStatus.textContent = msg || "";
     }
 
     // ---- Modal helpers ----
     function openForm(isEdit) {
       modalOverlay.classList.add("active");
       modalTitle.textContent = isEdit ? "Edit Employee" : "Add Employee";
+      setModalStatus("");
     }
     function closeForm() { modalOverlay.classList.remove("active"); }
 
@@ -634,6 +642,8 @@
       deleteBtn.disabled = true;
       editBadge.style.display = "none";
       saveBtn.textContent = "Save";
+      saveBtn.disabled = false;
+      setModalStatus("");
       modalTitle.textContent = "Add Employee";
     }
 
@@ -682,25 +692,46 @@
       deleteBtn.disabled = false;
       editBadge.style.display = "inline-block";
       saveBtn.textContent = "Update";
+      saveBtn.disabled = false;
+      setModalStatus("");
       modalTitle.textContent = "Edit Employee";
     }
 
-    // ---- Upload helper ----
+    // ---- Upload helper with progress ----
     async function uploadIfNeeded(empId, statusValue, fileInput, labelText) {
       if (!fileInput.files[0]) return null; // no new file
-      setStatus(`Uploading ${labelText} document...`);
+
       const file = fileInput.files[0];
       const path = `employee_docs/${empId}_${labelText}_${Date.now()}_${file.name}`;
       const storageRef = storage.ref().child(path);
-      const snap = await storageRef.put(file);
-      const url = await snap.ref.getDownloadURL();
-      return { url, name: file.name };
+
+      return new Promise((resolve, reject) => {
+        const uploadTask = storageRef.put(file);
+        uploadTask.on(
+          'state_changed',
+          snapshot => {
+            const pct = Math.round(
+              (snapshot.bytesTransferred / snapshot.totalBytes) * 100
+            );
+            setModalStatus(`${labelText} document upload: ${pct}%`);
+          },
+          error => {
+            reject(error);
+          },
+          async () => {
+            const url = await uploadTask.snapshot.ref.getDownloadURL();
+            setModalStatus(`${labelText} document upload: 100%`);
+            resolve({ url, name: file.name });
+          }
+        );
+      });
     }
 
     // ---- Save (Add / Update) ----
     async function handleSave() {
       const empId = empIdInput.value.trim();
       const name  = empNameInput.value.trim();
+
       if (!empId || !name) {
         alert("Emp ID and Name are mandatory.");
         return;
@@ -711,24 +742,29 @@
       const casteStatus        = empCasteStatusInput.value;
       const confirmationStatus = empConfirmationStatusInput.value;
 
-      // Check compulsory docs per field
+      // Validate required docs per field
       const missing = [];
       if (probationStatus === "Completed" && !probationDocInput.files[0] && !probationDocUrl)
-        missing.push("Probation");
+        missing.push("Probation Document");
       if (characterStatus === "Completed" && !characterDocInput.files[0] && !characterDocUrl)
-        missing.push("Character Verification");
+        missing.push("Character Verification Document");
       if (casteStatus === "Completed" && !casteDocInput.files[0] && !casteDocUrl)
-        missing.push("Caste Verification");
+        missing.push("Caste Verification Document");
       if (confirmationStatus === "Completed" && !confirmationDocInput.files[0] && !confirmationDocUrl)
-        missing.push("Confirmation");
+        missing.push("Confirmation Document");
 
       if (missing.length) {
         alert("Document required for:\n• " + missing.join("\n• "));
         return;
       }
 
+      // Disable save button and show status
+      saveBtn.disabled = true;
+      saveBtn.textContent = editingId ? "Updating..." : "Saving...";
+      setModalStatus("Preparing to upload / save...");
+
       try {
-        // Upload new docs if chosen
+        // Upload new docs if selected
         if (probationDocInput.files[0]) {
           const res = await uploadIfNeeded(empId, probationStatus, probationDocInput, "Probation");
           if (res) { probationDocUrl = res.url; probationDocName = res.name; }
@@ -746,7 +782,8 @@
           if (res) { confirmationDocUrl = res.url; confirmationDocName = res.name; }
         }
 
-        setStatus("Saving...");
+        setModalStatus("Saving to database...");
+
         const data = {
           empId,
           name,
@@ -781,15 +818,23 @@
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
           });
         }
+
+        setModalStatus("Reloading data...");
         await loadEmployees();
+
+        alert("Record saved successfully.");
         clearForm();
         closeForm();
-        setStatus("Saved successfully.");
+        setModalStatus("");
       } catch (err) {
         console.error("Error saving:", err);
         alert("Error saving data.\n" + err.message);
-        setStatus("Error saving.");
+        setModalStatus("Error saving.");
       }
+
+      // Re-enable save button
+      saveBtn.disabled = false;
+      saveBtn.textContent = "Save";
     }
 
     // ---- Delete ----
@@ -827,7 +872,7 @@
       }
     }
 
-    // ---- CSV helpers (unchanged statuses, no docs from CSV) ----
+    // ---- CSV helpers (no docs from CSV) ----
     function splitCsvRow(row) {
       const result = [];
       let current = "";
