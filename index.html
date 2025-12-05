@@ -2,11 +2,12 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Employee Database (Online - Firestore)</title>
+  <title>Employee Database</title>
 
   <!-- Firebase SDKs (compat version for simple usage) -->
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-storage-compat.js"></script>
 
   <style>
     * { box-sizing: border-box; font-family: Arial, sans-serif; }
@@ -20,9 +21,13 @@
       box-shadow: 0 4px 12px rgba(0,0,0,0.08);
     }
     h1 { margin-top: 0; text-align: center; color: #1f3b70; }
+
     .top-bar {
       display: flex; justify-content: space-between; align-items: center;
       gap: 10px; margin-bottom: 15px; flex-wrap: wrap;
+    }
+    .top-bar-left {
+      display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
     }
     .search-box input {
       padding: 8px 10px; min-width: 260px; border-radius: 4px;
@@ -39,33 +44,45 @@
       border: 1px solid #dfe5ff;
       background: #f6f8ff;
     }
-    .dash-table-wrapper {
-      max-height: 260px;
-      overflow: auto;
-      border-radius: 4px;
-      border: 1px solid #d0d8ff;
-      background: #fff;
+    .dash-card h3 {
+      margin: 2px 0 8px;
     }
-    .dash-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 12px;
+
+    /* Designation summary cards row */
+    .dash-card-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 4px;
     }
-    .dash-table th, .dash-table td {
-      padding: 4px 6px;
-      border-bottom: 1px solid #edf0ff;
-      text-align: left;
+    .dash-summary-card {
+      min-width: 130px;
+      padding: 8px 10px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #e4e9ff, #f7f9ff);
+      border: 1px solid #c8d5ff;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.05);
     }
-    .dash-table thead {
-      background: #e6ebff;
-      position: sticky;
-      top: 0;
-      z-index: 1;
+    .dash-summary-card-title {
+      font-size: 11px;
+      font-weight: bold;
+      color: #24366a;
+      margin-bottom: 3px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .dash-summary-card-count {
+      font-size: 16px;
+      font-weight: bold;
+      color: #1f3b70;
     }
 
     .form-card {
       background: #f9fbff; border: 1px solid #dde5ff;
-      border-radius: 6px; padding: 10px 14px 14px; margin-bottom: 16px;
+      border-radius: 6px; padding: 10px 14px 14px;
+      max-height: 80vh;
+      overflow-y: auto;
     }
     .form-grid {
       display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -78,11 +95,11 @@
     .field label {
       display: block; font-size: 12px; color: #445; margin-bottom: 2px;
     }
-    .field input {
+    .field input, .field select {
       width: 100%; padding: 7px 9px; border-radius: 4px;
       border: 1px solid #b8c4dd; outline: none; font-size: 13px;
     }
-    .field input:focus {
+    .field input:focus, .field select:focus {
       border-color: #3955a4; box-shadow: 0 0 0 2px rgba(57,85,164,0.18);
     }
 
@@ -94,6 +111,11 @@
     .btn-primary  { background: #3955a4; color: #fff; }
     .btn-secondary{ background: #e3e7f7; color: #222; }
     .btn-danger   { background: #d9534f; color: #fff; }
+    .btn-small    { padding: 4px 8px; font-size: 11px; }
+    .btn-ghost {
+      background: transparent;
+      border: 1px solid #ced3ec;
+    }
     button:disabled { opacity: 0.6; cursor: not-allowed; }
 
     table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 6px; }
@@ -102,7 +124,7 @@
       padding: 6px 5px; border-bottom: 1px solid #d9e0f2; text-align: left;
       vertical-align: top;
     }
-    tbody tr:hover { background: #f0f4ff; cursor: pointer; }
+    tbody tr:hover { background: #f0f4ff; }
 
     .footer-note { margin-top: 8px; font-size: 11px; color: #666; text-align: right; }
     .badge-edit {
@@ -110,6 +132,52 @@
       background: #ffe9b0; color: #7f4a00; margin-left: 6px;
     }
     .status { font-size: 11px; color: #888; margin-left: 8px; }
+
+    /* Modal / Popup styles */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.35);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 10px;
+      z-index: 1000;
+    }
+    .modal-overlay.active {
+      display: flex;
+    }
+    .modal {
+      background: #fff;
+      border-radius: 8px;
+      max-width: 900px;
+      width: 100%;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.18);
+      position: relative;
+    }
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px 6px;
+      border-bottom: 1px solid #dde3ff;
+    }
+    .modal-title {
+      font-weight: bold;
+      color: #1f3b70;
+    }
+    .modal-close {
+      background: transparent;
+      border: none;
+      font-size: 18px;
+      cursor: pointer;
+      line-height: 1;
+    }
+
+    .doc-info {
+      font-size: 11px;
+      margin-top: 3px;
+    }
   </style>
 </head>
 <body>
@@ -117,99 +185,28 @@
     <h1>Employee Database (Online - Firestore)</h1>
 
     <div class="top-bar">
-      <div>
-        <strong>Total Employees:</strong> <span id="empCount">0</span>
-        <span class="status" id="statusText"></span>
+      <div class="top-bar-left">
+        <div>
+          <strong>Total Employees:</strong> <span id="empCount">0</span>
+          <span class="status" id="statusText"></span>
+        </div>
+        <button class="btn-primary btn-small" id="addEmpBtn">+ Add Employee</button>
       </div>
       <div class="search-box">
         <input type="text" id="searchInput"
-               placeholder="Search by ID / Name / Designation / Branch / Contact..." />
+               placeholder="Search by ID / Name / Designation / Branch / Contact / Status..." />
       </div>
     </div>
 
-    <!-- Designation-wise Dashboard (table only) -->
+    <!-- Designation-wise Dashboard (only cards) -->
     <div class="dash-card">
-      <h3 style="margin:2px 0 8px;">Designation-wise Summary</h3>
-      <div class="dash-table-wrapper">
-        <table class="dash-table">
-          <thead>
-            <tr>
-              <th style="width:40px;">#</th>
-              <th>Designation</th>
-              <th>Employees</th>
-            </tr>
-          </thead>
-          <tbody id="dashBody">
-            <!-- Filled by JS -->
-          </tbody>
-        </table>
+      <h3>Designation-wise Summary</h3>
+      <div class="dash-card-row" id="dashCardRow">
+        <!-- Filled by JS -->
       </div>
     </div>
 
-    <div class="form-card">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
-        <strong>Employee Details</strong>
-        <span id="editBadge" class="badge-edit" style="display:none;">Editing existing record</span>
-      </div>
-
-      <div class="form-grid">
-        <div class="field">
-          <label for="empId">Emp ID *</label>
-          <input type="text" id="empId" />
-        </div>
-        <div class="field">
-          <label for="empName">Officer / Official Name *</label>
-          <input type="text" id="empName" />
-        </div>
-        <div class="field">
-          <label for="empDesignation">Designation</label>
-          <input type="text" id="empDesignation" />
-        </div>
-        <div class="field">
-          <label for="empGroup">Group</label>
-          <input type="text" id="empGroup" />
-        </div>
-        <div class="field">
-          <label for="empBranch">Branch</label>
-          <input type="text" id="empBranch" />
-        </div>
-        <div class="field">
-          <label for="empGender">Gender</label>
-          <input type="text" id="empGender" />
-        </div>
-        <div class="field">
-          <label for="empDob">DoB</label>
-          <input type="text" id="empDob" placeholder="dd-mm-yyyy" />
-        </div>
-        <div class="field">
-          <label for="empRetirement">Retirement</label>
-          <input type="text" id="empRetirement" placeholder="dd-mm-yyyy" />
-        </div>
-        <div class="field">
-          <label for="empDojBranch">DoJ (Branch)</label>
-          <input type="text" id="empDojBranch" placeholder="dd-mm-yyyy" />
-        </div>
-        <div class="field">
-          <label for="empDojAU">DoJ (Accounting Unit)</label>
-          <input type="text" id="empDojAU" placeholder="dd-mm-yyyy" />
-        </div>
-        <div class="field">
-          <label for="empContact">Contact Details</label>
-          <input type="text" id="empContact" />
-        </div>
-      </div>
-
-      <div class="buttons">
-        <button class="btn-primary" id="saveBtn">Save</button>
-        <button class="btn-secondary" id="clearBtn">Clear</button>
-        <button class="btn-danger" id="deleteBtn" disabled>Delete</button>
-
-        <!-- CSV Import -->
-        <button class="btn-secondary" id="importBtn" type="button">Import CSV</button>
-        <input type="file" id="csvFileInput" accept=".csv" style="display:none;">
-      </div>
-    </div>
-
+    <!-- MAIN TABLE -->
     <table>
       <thead>
         <tr>
@@ -225,6 +222,11 @@
           <th>DoJ (Branch)</th>
           <th>DoJ (A.U.)</th>
           <th>Contact</th>
+          <th>Probation Status</th>
+          <th>Character Verification</th>
+          <th>Caste Verification</th>
+          <th>Confirmation Status</th>
+          <th style="width:110px;">Actions</th>
         </tr>
       </thead>
       <tbody id="empTableBody">
@@ -237,8 +239,160 @@
     </div>
   </div>
 
+  <!-- POPUP / MODAL FOR ADD / EDIT EMPLOYEE -->
+  <div id="modalOverlay" class="modal-overlay">
+    <div class="modal">
+      <div class="modal-header">
+        <span class="modal-title" id="modalTitle">Add Employee</span>
+        <button class="modal-close" id="modalCloseBtn" title="Close">&times;</button>
+      </div>
+      <div class="form-card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+          <strong>Employee Details</strong>
+          <span id="editBadge" class="badge-edit" style="display:none;">Editing existing record</span>
+        </div>
+
+        <div class="form-grid">
+          <!-- Basic details -->
+          <div class="field">
+            <label for="empId">Emp ID *</label>
+            <input type="text" id="empId" />
+          </div>
+          <div class="field">
+            <label for="empName">Officer / Official Name *</label>
+            <input type="text" id="empName" />
+          </div>
+          <div class="field">
+            <label for="empDesignation">Designation</label>
+            <input type="text" id="empDesignation" />
+          </div>
+          <div class="field">
+            <label for="empGroup">Group</label>
+            <input type="text" id="empGroup" />
+          </div>
+          <div class="field">
+            <label for="empBranch">Branch</label>
+            <input type="text" id="empBranch" />
+          </div>
+          <div class="field">
+            <label for="empGender">Gender</label>
+            <input type="text" id="empGender" />
+          </div>
+          <div class="field">
+            <label for="empDob">DoB</label>
+            <input type="text" id="empDob" placeholder="dd-mm-yyyy" />
+          </div>
+          <div class="field">
+            <label for="empRetirement">Retirement</label>
+            <input type="text" id="empRetirement" placeholder="dd-mm-yyyy" />
+          </div>
+          <div class="field">
+            <label for="empDojBranch">DoJ (Branch)</label>
+            <input type="text" id="empDojBranch" placeholder="dd-mm-yyyy" />
+          </div>
+          <div class="field">
+            <label for="empDojAU">DoJ (Accounting Unit)</label>
+            <input type="text" id="empDojAU" placeholder="dd-mm-yyyy" />
+          </div>
+          <div class="field">
+            <label for="empContact">Contact Details</label>
+            <input type="text" id="empContact" />
+          </div>
+
+          <!-- Status + per-field upload -->
+
+          <!-- Probation -->
+          <div class="field">
+            <label for="empProbationStatus">Probation Status</label>
+            <select id="empProbationStatus">
+              <option value="">-- Select --</option>
+              <option value="Pending">Pending</option>
+              <option value="Completed">Completed</option>
+              <option value="Not Applicable">Not Applicable</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="probationDocInput">Probation Document (required if Completed)</label>
+            <input type="file" id="probationDocInput" accept=".pdf"/>
+            <div id="probationDocInfo" class="doc-info" style="display:none;">
+              Existing:
+              <a id="probationDocLink" href="#" target="_blank"></a>
+            </div>
+          </div>
+
+          <!-- Character -->
+          <div class="field">
+            <label for="empCharacterStatus">Character Verification Status</label>
+            <select id="empCharacterStatus">
+              <option value="">-- Select --</option>
+              <option value="Pending">Pending</option>
+              <option value="Completed">Completed</option>
+              <option value="Not Applicable">Not Applicable</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="characterDocInput">Character Verification Document (required if Completed)</label>
+            <input type="file" id="characterDocInput" />
+            <div id="characterDocInfo" class="doc-info" style="display:none;">
+              Existing:
+              <a id="characterDocLink" href="#" target="_blank"></a>
+            </div>
+          </div>
+
+          <!-- Caste -->
+          <div class="field">
+            <label for="empCasteStatus">Caste Verification Status</label>
+            <select id="empCasteStatus">
+              <option value="">-- Select --</option>
+              <option value="Pending">Pending</option>
+              <option value="Completed">Completed</option>
+              <option value="Not Applicable">Not Applicable</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="casteDocInput">Caste Verification Document (required if Completed)</label>
+            <input type="file" id="casteDocInput" />
+            <div id="casteDocInfo" class="doc-info" style="display:none;">
+              Existing:
+              <a id="casteDocLink" href="#" target="_blank"></a>
+            </div>
+          </div>
+
+          <!-- Confirmation -->
+          <div class="field">
+            <label for="empConfirmationStatus">Confirmation Status</label>
+            <select id="empConfirmationStatus">
+              <option value="">-- Select --</option>
+              <option value="Pending">Pending</option>
+              <option value="Completed">Completed</option>
+              <option value="Not Applicable">Not Applicable</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="confirmationDocInput">Confirmation Document (required if Completed)</label>
+            <input type="file" id="confirmationDocInput" />
+            <div id="confirmationDocInfo" class="doc-info" style="display:none;">
+              Existing:
+              <a id="confirmationDocLink" href="#" target="_blank"></a>
+            </div>
+          </div>
+        </div>
+
+        <div class="buttons">
+          <button class="btn-primary" id="saveBtn">Save</button>
+          <button class="btn-secondary" id="clearBtn" type="button">Clear</button>
+          <button class="btn-danger" id="deleteBtn" disabled>Delete</button>
+
+          <!-- CSV Import -->
+          <button class="btn-secondary" id="importBtn" type="button">Import CSV</button>
+          <input type="file" id="csvFileInput" accept=".csv" style="display:none;">
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script>
-    // --- Your Firebase config (empdb-2c5bb) ---
+    // --- Firebase config ---
     const firebaseConfig = {
       apiKey: "AIzaSyBl0JbugtktEVUP-Pdg6Rl0nzK9u10aN2c",
       authDomain: "empdb-2c5bb.firebaseapp.com",
@@ -249,14 +403,20 @@
       measurementId: "G-JX251BG0G2"
     };
 
-    // Initialize Firebase (compat SDK)
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
+    const storage = firebase.storage();
     const empCollection = db.collection("employees");
 
     // ---- State ----
     let employees = [];
     let editingId = null;
+
+    // Per-field document state
+    let probationDocUrl = "", probationDocName = "";
+    let characterDocUrl = "", characterDocName = "";
+    let casteDocUrl = "", casteDocName = "";
+    let confirmationDocUrl = "", confirmationDocName = "";
 
     // ---- DOM ----
     const empIdInput       = document.getElementById("empId");
@@ -271,6 +431,27 @@
     const empDojAUInput      = document.getElementById("empDojAU");
     const empContactInput    = document.getElementById("empContact");
 
+    const empProbationStatusInput   = document.getElementById("empProbationStatus");
+    const empCharacterStatusInput   = document.getElementById("empCharacterStatus");
+    const empCasteStatusInput       = document.getElementById("empCasteStatus");
+    const empConfirmationStatusInput= document.getElementById("empConfirmationStatus");
+
+    const probationDocInput   = document.getElementById("probationDocInput");
+    const probationDocInfo    = document.getElementById("probationDocInfo");
+    const probationDocLink    = document.getElementById("probationDocLink");
+
+    const characterDocInput   = document.getElementById("characterDocInput");
+    const characterDocInfo    = document.getElementById("characterDocInfo");
+    const characterDocLink    = document.getElementById("characterDocLink");
+
+    const casteDocInput       = document.getElementById("casteDocInput");
+    const casteDocInfo        = document.getElementById("casteDocInfo");
+    const casteDocLink        = document.getElementById("casteDocLink");
+
+    const confirmationDocInput = document.getElementById("confirmationDocInput");
+    const confirmationDocInfo  = document.getElementById("confirmationDocInfo");
+    const confirmationDocLink  = document.getElementById("confirmationDocLink");
+
     const empTableBody   = document.getElementById("empTableBody");
     const empCountLabel  = document.getElementById("empCount");
     const searchInput    = document.getElementById("searchInput");
@@ -281,13 +462,25 @@
     const statusText     = document.getElementById("statusText");
     const importBtn      = document.getElementById("importBtn");
     const csvFileInput   = document.getElementById("csvFileInput");
-    const dashBody       = document.getElementById("dashBody");
+    const dashCardRow    = document.getElementById("dashCardRow");
+
+    const addEmpBtn      = document.getElementById("addEmpBtn");
+    const modalOverlay   = document.getElementById("modalOverlay");
+    const modalCloseBtn  = document.getElementById("modalCloseBtn");
+    const modalTitle     = document.getElementById("modalTitle");
 
     function setStatus(msg) {
       statusText.textContent = msg || "";
     }
 
-    // ---- Load data from Firestore ----
+    // ---- Modal helpers ----
+    function openForm(isEdit) {
+      modalOverlay.classList.add("active");
+      modalTitle.textContent = isEdit ? "Edit Employee" : "Add Employee";
+    }
+    function closeForm() { modalOverlay.classList.remove("active"); }
+
+    // ---- Load data ----
     async function loadEmployees() {
       try {
         setStatus("Loading...");
@@ -306,28 +499,29 @@
       }
     }
 
-    // ---- Render main table ----
+    // ---- Render table ----
     function renderTable() {
       const search = (searchInput.value || "").toLowerCase().trim();
       empTableBody.innerHTML = "";
-
       let filtered = employees;
+
       if (search) {
-        filtered = employees.filter(emp => {
-          return (
-            (emp.empId || "").toLowerCase().includes(search) ||
-            (emp.name || "").toLowerCase().includes(search) ||
-            (emp.designation || "").toLowerCase().includes(search) ||
-            (emp.branch || "").toLowerCase().includes(search) ||
-            (emp.contact || "").toLowerCase().includes(search)
-          );
-        });
+        filtered = employees.filter(emp => (
+          (emp.empId || "").toLowerCase().includes(search) ||
+          (emp.name || "").toLowerCase().includes(search) ||
+          (emp.designation || "").toLowerCase().includes(search) ||
+          (emp.branch || "").toLowerCase().includes(search) ||
+          (emp.contact || "").toLowerCase().includes(search) ||
+          (emp.probationStatus || "").toLowerCase().includes(search) ||
+          (emp.characterStatus || "").toLowerCase().includes(search) ||
+          (emp.casteStatus || "").toLowerCase().includes(search) ||
+          (emp.confirmationStatus || "").toLowerCase().includes(search)
+        ));
       }
 
       filtered.forEach((emp, index) => {
         const tr = document.createElement("tr");
         tr.dataset.id = emp.id;
-
         tr.innerHTML = `
           <td>${index + 1}</td>
           <td>${emp.empId || ""}</td>
@@ -341,42 +535,68 @@
           <td>${emp.dojBranch || ""}</td>
           <td>${emp.dojAU || ""}</td>
           <td>${emp.contact || ""}</td>
+          <td>${emp.probationStatus || ""}</td>
+          <td>${emp.characterStatus || ""}</td>
+          <td>${emp.casteStatus || ""}</td>
+          <td>${emp.confirmationStatus || ""}</td>
+          <td>
+            <button class="btn-ghost btn-small edit-btn" type="button">Edit</button>
+            <button class="btn-danger btn-small row-del-btn" type="button">Del</button>
+          </td>
         `;
-
-        tr.addEventListener("click", () => {
+        tr.querySelector(".edit-btn").addEventListener("click", e => {
+          e.stopPropagation();
           startEditing(emp.id);
+          openForm(true);
         });
-
+        tr.querySelector(".row-del-btn").addEventListener("click", e => {
+          e.stopPropagation();
+          handleRowDelete(emp.id);
+        });
         empTableBody.appendChild(tr);
       });
 
       empCountLabel.textContent = employees.length;
     }
 
-    // ---- Designation-wise dashboard table ----
+    // ---- Dashboard cards ----
     function updateDashboard() {
       const counts = {};
       employees.forEach(emp => {
-        const raw = emp.designation || "";
-        const key = raw.trim() || "(No Designation)";
+        const key = (emp.designation || "").trim() || "(No Designation)";
         counts[key] = (counts[key] || 0) + 1;
       });
-
       const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]);
 
-      dashBody.innerHTML = "";
-      entries.forEach(([designation, count], idx) => {
-        const tr = document.createElement("tr");
-        tr.innerHTML = `
-          <td>${idx + 1}</td>
-          <td>${designation}</td>
-          <td>${count}</td>
+      dashCardRow.innerHTML = "";
+      entries.forEach(([designation, count]) => {
+        const card = document.createElement("div");
+        card.className = "dash-summary-card";
+        card.innerHTML = `
+          <div class="dash-summary-card-title">${designation}</div>
+          <div class="dash-summary-card-count">${count}</div>
         `;
-        dashBody.appendChild(tr);
+        dashCardRow.appendChild(card);
       });
     }
 
-    // ---- Form helpers ----
+    // ---- Helper to reset doc UI for one field ----
+    function resetDocField(infoEl, linkEl) {
+      infoEl.style.display = "none";
+      linkEl.href = "#";
+      linkEl.textContent = "";
+    }
+    function setDocField(infoEl, linkEl, url, name) {
+      if (url) {
+        infoEl.style.display = "block";
+        linkEl.href = url;
+        linkEl.textContent = name || "View document";
+      } else {
+        resetDocField(infoEl, linkEl);
+      }
+    }
+
+    // ---- Clear form ----
     function clearForm() {
       empIdInput.value = "";
       empNameInput.value = "";
@@ -390,12 +610,34 @@
       empDojAUInput.value = "";
       empContactInput.value = "";
 
+      empProbationStatusInput.value = "";
+      empCharacterStatusInput.value = "";
+      empCasteStatusInput.value = "";
+      empConfirmationStatusInput.value = "";
+
+      probationDocInput.value = "";
+      characterDocInput.value = "";
+      casteDocInput.value = "";
+      confirmationDocInput.value = "";
+
+      probationDocUrl = probationDocName = "";
+      characterDocUrl = characterDocName = "";
+      casteDocUrl = casteDocName = "";
+      confirmationDocUrl = confirmationDocName = "";
+
+      resetDocField(probationDocInfo, probationDocLink);
+      resetDocField(characterDocInfo, characterDocLink);
+      resetDocField(casteDocInfo, casteDocLink);
+      resetDocField(confirmationDocInfo, confirmationDocLink);
+
       editingId = null;
       deleteBtn.disabled = true;
       editBadge.style.display = "none";
       saveBtn.textContent = "Save";
+      modalTitle.textContent = "Add Employee";
     }
 
+    // ---- Start editing ----
     function startEditing(id) {
       const emp = employees.find(e => e.id === id);
       if (!emp) return;
@@ -413,37 +655,124 @@
       empDojAUInput.value = emp.dojAU || "";
       empContactInput.value = emp.contact || "";
 
+      empProbationStatusInput.value    = emp.probationStatus    || "";
+      empCharacterStatusInput.value    = emp.characterStatus    || "";
+      empCasteStatusInput.value        = emp.casteStatus        || "";
+      empConfirmationStatusInput.value = emp.confirmationStatus || "";
+
+      probationDocUrl = emp.probationDocUrl || "";
+      probationDocName= emp.probationDocName||"";
+      characterDocUrl = emp.characterDocUrl || "";
+      characterDocName= emp.characterDocName||"";
+      casteDocUrl     = emp.casteDocUrl     || "";
+      casteDocName    = emp.casteDocName    ||"";
+      confirmationDocUrl = emp.confirmationDocUrl || "";
+      confirmationDocName= emp.confirmationDocName||"";
+
+      probationDocInput.value = "";
+      characterDocInput.value = "";
+      casteDocInput.value = "";
+      confirmationDocInput.value = "";
+
+      setDocField(probationDocInfo, probationDocLink, probationDocUrl, probationDocName);
+      setDocField(characterDocInfo, characterDocLink, characterDocUrl, characterDocName);
+      setDocField(casteDocInfo, casteDocLink, casteDocUrl, casteDocName);
+      setDocField(confirmationDocInfo, confirmationDocLink, confirmationDocUrl, confirmationDocName);
+
       deleteBtn.disabled = false;
       editBadge.style.display = "inline-block";
       saveBtn.textContent = "Update";
+      modalTitle.textContent = "Edit Employee";
+    }
+
+    // ---- Upload helper ----
+    async function uploadIfNeeded(empId, statusValue, fileInput, labelText) {
+      if (!fileInput.files[0]) return null; // no new file
+      setStatus(`Uploading ${labelText} document...`);
+      const file = fileInput.files[0];
+      const path = `employee_docs/${empId}_${labelText}_${Date.now()}_${file.name}`;
+      const storageRef = storage.ref().child(path);
+      const snap = await storageRef.put(file);
+      const url = await snap.ref.getDownloadURL();
+      return { url, name: file.name };
     }
 
     // ---- Save (Add / Update) ----
     async function handleSave() {
       const empId = empIdInput.value.trim();
       const name  = empNameInput.value.trim();
-
       if (!empId || !name) {
         alert("Emp ID and Name are mandatory.");
         return;
       }
 
-      const data = {
-        empId,
-        name,
-        designation: empDesignationInput.value.trim(),
-        group:       empGroupInput.value.trim(),
-        branch:      empBranchInput.value.trim(),
-        gender:      empGenderInput.value.trim(),
-        dob:         empDobInput.value.trim(),
-        retirement:  empRetirementInput.value.trim(),
-        dojBranch:   empDojBranchInput.value.trim(),
-        dojAU:       empDojAUInput.value.trim(),
-        contact:     empContactInput.value.trim()
-      };
+      const probationStatus    = empProbationStatusInput.value;
+      const characterStatus    = empCharacterStatusInput.value;
+      const casteStatus        = empCasteStatusInput.value;
+      const confirmationStatus = empConfirmationStatusInput.value;
+
+      // Check compulsory docs per field
+      const missing = [];
+      if (probationStatus === "Completed" && !probationDocInput.files[0] && !probationDocUrl)
+        missing.push("Probation");
+      if (characterStatus === "Completed" && !characterDocInput.files[0] && !characterDocUrl)
+        missing.push("Character Verification");
+      if (casteStatus === "Completed" && !casteDocInput.files[0] && !casteDocUrl)
+        missing.push("Caste Verification");
+      if (confirmationStatus === "Completed" && !confirmationDocInput.files[0] && !confirmationDocUrl)
+        missing.push("Confirmation");
+
+      if (missing.length) {
+        alert("Document required for:\n• " + missing.join("\n• "));
+        return;
+      }
 
       try {
+        // Upload new docs if chosen
+        if (probationDocInput.files[0]) {
+          const res = await uploadIfNeeded(empId, probationStatus, probationDocInput, "Probation");
+          if (res) { probationDocUrl = res.url; probationDocName = res.name; }
+        }
+        if (characterDocInput.files[0]) {
+          const res = await uploadIfNeeded(empId, characterStatus, characterDocInput, "Character");
+          if (res) { characterDocUrl = res.url; characterDocName = res.name; }
+        }
+        if (casteDocInput.files[0]) {
+          const res = await uploadIfNeeded(empId, casteStatus, casteDocInput, "Caste");
+          if (res) { casteDocUrl = res.url; casteDocName = res.name; }
+        }
+        if (confirmationDocInput.files[0]) {
+          const res = await uploadIfNeeded(empId, confirmationStatus, confirmationDocInput, "Confirmation");
+          if (res) { confirmationDocUrl = res.url; confirmationDocName = res.name; }
+        }
+
         setStatus("Saving...");
+        const data = {
+          empId,
+          name,
+          designation:     empDesignationInput.value.trim(),
+          group:           empGroupInput.value.trim(),
+          branch:          empBranchInput.value.trim(),
+          gender:          empGenderInput.value.trim(),
+          dob:             empDobInput.value.trim(),
+          retirement:      empRetirementInput.value.trim(),
+          dojBranch:       empDojBranchInput.value.trim(),
+          dojAU:           empDojAUInput.value.trim(),
+          contact:         empContactInput.value.trim(),
+          probationStatus,
+          characterStatus,
+          casteStatus,
+          confirmationStatus,
+          probationDocUrl,
+          probationDocName,
+          characterDocUrl,
+          characterDocName,
+          casteDocUrl,
+          casteDocName,
+          confirmationDocUrl,
+          confirmationDocName
+        };
+
         if (editingId) {
           await empCollection.doc(editingId).set(data, { merge: true });
         } else {
@@ -454,6 +783,7 @@
         }
         await loadEmployees();
         clearForm();
+        closeForm();
         setStatus("Saved successfully.");
       } catch (err) {
         console.error("Error saving:", err);
@@ -472,6 +802,7 @@
         await empCollection.doc(editingId).delete();
         await loadEmployees();
         clearForm();
+        closeForm();
         setStatus("Deleted successfully.");
       } catch (err) {
         console.error("Error deleting:", err);
@@ -480,58 +811,68 @@
       }
     }
 
-    // ---- CSV Parsing (handles commas inside quotes) ----
+    async function handleRowDelete(id) {
+      if (!id) return;
+      if (!confirm("Are you sure you want to delete this record?")) return;
+
+      try {
+        setStatus("Deleting...");
+        await empCollection.doc(id).delete();
+        await loadEmployees();
+        setStatus("Deleted successfully.");
+      } catch (err) {
+        console.error("Error deleting:", err);
+        alert("Error deleting data.\n" + err.message);
+        setStatus("Error deleting.");
+      }
+    }
+
+    // ---- CSV helpers (unchanged statuses, no docs from CSV) ----
     function splitCsvRow(row) {
       const result = [];
       let current = "";
       let inQuotes = false;
-
       for (let i = 0; i < row.length; i++) {
         const ch = row[i];
-
         if (ch === '"') {
           if (inQuotes && i + 1 < row.length && row[i + 1] === '"') {
-            current += '"';
-            i++;
-          } else {
-            inQuotes = !inQuotes;
-          }
+            current += '"'; i++;
+          } else inQuotes = !inQuotes;
         } else if (ch === ',' && !inQuotes) {
-          result.push(current);
-          current = "";
-        } else {
-          current += ch;
-        }
+          result.push(current); current = "";
+        } else current += ch;
       }
       result.push(current);
       return result;
     }
 
     function parseCsv(text) {
-      const lines = text.split(/\r?\n/).filter(line => line.trim() !== "");
+      const lines = text.split(/\r?\n/).filter(l => l.trim() !== "");
       if (lines.length <= 1) return [];
-
       const rows = [];
-      // Skip header line (0) – expects your header order
-      // A:Emp ID, B:Name, C:Category(ignored), D:Designation, E:Group, F:Branch,
-      // G:Gender, H:DoB, I:Retirement, J:DoJ(Branch), K:DoJ(AU), L:Contact
+      // 0:Emp ID, 1:Name, 2:Category(ignored), 3:Designation, 4:Group,
+      // 5:Branch, 6:Gender, 7:DoB, 8:Retirement, 9:DoJ(Branch),
+      // 10:DoJ(AU), 11:Contact,
+      // 12:ProbationStatus, 13:CharacterStatus, 14:CasteStatus, 15:ConfirmationStatus
       for (let i = 1; i < lines.length; i++) {
         const cols = splitCsvRow(lines[i]);
-        if (cols.length === 0) continue;
-
+        if (!cols.length) continue;
         rows.push({
-          empId:      (cols[0]  || "").trim(),
-          name:       (cols[1]  || "").trim(),
-          // cols[2] is Category -> ignored
-          designation:(cols[3]  || "").trim(),
-          group:      (cols[4]  || "").trim(),
-          branch:     (cols[5]  || "").trim(),
-          gender:     (cols[6]  || "").trim(),
-          dob:        (cols[7]  || "").trim(),
-          retirement: (cols[8]  || "").trim(),
-          dojBranch:  (cols[9]  || "").trim(),
-          dojAU:      (cols[10] || "").trim(),
-          contact:    (cols[11] || "").trim()
+          empId:              (cols[0]  || "").trim(),
+          name:               (cols[1]  || "").trim(),
+          designation:        (cols[3]  || "").trim(),
+          group:              (cols[4]  || "").trim(),
+          branch:             (cols[5]  || "").trim(),
+          gender:             (cols[6]  || "").trim(),
+          dob:                (cols[7]  || "").trim(),
+          retirement:         (cols[8]  || "").trim(),
+          dojBranch:          (cols[9]  || "").trim(),
+          dojAU:              (cols[10] || "").trim(),
+          contact:            (cols[11] || "").trim(),
+          probationStatus:    (cols[12] || "").trim(),
+          characterStatus:    (cols[13] || "").trim(),
+          casteStatus:        (cols[14] || "").trim(),
+          confirmationStatus: (cols[15] || "").trim()
         });
       }
       return rows;
@@ -540,23 +881,19 @@
     function handleCsvFileChange(event) {
       const file = event.target.files[0];
       if (!file) return;
-
       if (!confirm("Import employees from file: " + file.name + " ?")) {
         event.target.value = "";
         return;
       }
-
       const reader = new FileReader();
-      reader.onload = async (e) => {
+      reader.onload = async e => {
         const text = e.target.result;
         const rows = parseCsv(text);
-
         if (!rows.length) {
-          alert("No valid rows found in CSV.\nCheck that the first row is the header and data starts from second row.");
+          alert("No valid rows found in CSV.");
           csvFileInput.value = "";
           return;
         }
-
         try {
           setStatus("Importing " + rows.length + " record(s)...");
           for (const row of rows) {
@@ -587,6 +924,11 @@
 
     importBtn.addEventListener("click", () => csvFileInput.click());
     csvFileInput.addEventListener("change", handleCsvFileChange);
+
+    addEmpBtn.addEventListener("click", () => { clearForm(); openForm(false); });
+    modalCloseBtn.addEventListener("click", () => { closeForm(); });
+
+    modalOverlay.addEventListener("click", e => { if (e.target === modalOverlay) closeForm(); });
 
     // ---- Init ----
     loadEmployees();
