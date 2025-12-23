@@ -476,19 +476,19 @@ function parseCsv(text) {
     rows.push({
       empId:              (cols[0]  || "").trim(),
       name:               (cols[1]  || "").trim(),
-      designation:        (cols[3]  || "").trim(),
-      group:              (cols[4]  || "").trim(),
-      branch:             (cols[5]  || "").trim(),
-      gender:             (cols[6]  || "").trim(),
-      dob:                (cols[7]  || "").trim(),
-      retirement:         (cols[8]  || "").trim(),
-      dojBranch:          (cols[9]  || "").trim(),
-      dojAU:              (cols[10] || "").trim(),
-      contact:            (cols[11] || "").trim(),
-      probationStatus:    (cols[12] || "").trim(),
-      characterStatus:    (cols[13] || "").trim(),
-      casteStatus:        (cols[14] || "").trim(),
-      confirmationStatus: (cols[15] || "").trim()
+      designation:        (cols[2]  || "").trim(),
+      group:              (cols[3]  || "").trim(),
+      branch:             (cols[4]  || "").trim(),
+      gender:             (cols[5]  || "").trim(),
+      dob:                (cols[6]  || "").trim(),
+      retirement:         (cols[7]  || "").trim(),
+      dojBranch:          (cols[8]  || "").trim(),
+      dojAU:              (cols[9] || "").trim(),
+      contact:            (cols[10] || "").trim(),
+      probationStatus:    (cols[11] || "").trim(),
+      characterStatus:    (cols[12] || "").trim(),
+      casteStatus:        (cols[13] || "").trim(),
+      confirmationStatus: (cols[14] || "").trim()
     });
   }
   return rows;
